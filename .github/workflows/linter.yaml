@@ -1,0 +1,24 @@
+name: Run flake 8
+
+on:
+  push:
+    branches: 
+      - "*"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Checkout Code
+      uses: actions/checkout@v2
+    - name: Install python modules
+      run: sudo apt install -y --no-install-recommends python3-venv python3-setuptools
+    - name: Install pip packages
+      run: |
+        python3 -m venv .venv
+        .venv/bin/pip install -r ./requirements.txt
+      env:
+        PIPENV_VENV_IN_PROJECT: 1
+    - name: Run linter
+      run: .venv/bin/python -m flake8 ./src/
