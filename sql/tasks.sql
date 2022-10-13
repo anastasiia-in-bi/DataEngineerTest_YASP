@@ -26,34 +26,37 @@ FROM d FULL OUTER JOIN c ON d.account_id = c.account_id AND d.operation_date = c
 ORDER BY operation_date, agreement_num;
 
 /* task4 */
-with t1 as (
-	select tlg, name, dt, row_number() over(order by org_id, dt) as r
-	from custom.org),
-t2 as (
-	select dt, row_number() over(order by org_id, dt) as r
-	from custom.org)
-select
-	CASE WHEN t1.dt + INTERVAL '1' DAY = t2.dt THEN null
-    ELSE t1.dt END
-    AS dt_to,
-    CASE when t1.dt = '2022-01-01' then '2022-01-01'
-    else t1.dt end
-    AS dt_from,
-    t1.tlg as title, t1.name as long_title
-from t1 full outer  JOIN t2
-on t1.r+1 = t2.r
-order by t1.name, t1.dt;
+ CREATE TEMPORARY VIEW task4 AS (
+	WITH CTE AS(
+--date groups creation
+		SELECT *,
+			dt-(ROW_NUMBER() OVER (PARTITION BY org_id, parent_id, tlg, name ORDER BY dt) * INTERVAL '1 day') as dt_group
+		FROM custom.org
+	)
+--get the start and end dates
+	SELECT max(dt) as dt_to, min(dt) as dt_from, tlg as title, name as long_title,
+			row_number() over (order by org_id, min(dt)) as rn
+	FROM CTE
+	GROUP BY tlg, name, org_id, parent_id, dt_group
+	ORDER BY org_id, dt_from
+);
 
+WITH cte AS (
+	SELECT  min(rn) as rn,
+			"title",
+			json_agg(json_build_object('to', "dt_to",
+										'from', "dt_from",
+										'title', "title",
+ 										'long_title', "long_title")) intermediate_json
+    FROM task4
+    GROUP BY "title"
+)
+SELECT row_number() over (order by rn) as obj,
+		row_to_json(row(json_build_object('temporalTitles', intermediate_json)))->>'f1' as json_build_object
+FROM cte
+ORDER BY obj;
 
-
-
-
-
-
-
-
-
-/* task5 */
+  /* task5 */
 WITH RECURSIVE t1 (org_id, parent_id, name, path, lvl) AS (
     SELECT o.org_id, o.parent_id, o.name, CAST (o.name AS varchar (50)) AS path, 0
     FROM custom.org o
